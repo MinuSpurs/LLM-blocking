@@ -19,7 +19,7 @@ def get_documents(query, maxnum=10, max_disp_len=200, retries=5, backoff_factor=
             response.raise_for_status()
             return response.json()['documents']
         except requests.exceptions.HTTPError as e:
-            if response.status_code in [429, 504]:  
+            if response.status_code in [429, 504]:  # 처리 제한 초과 및 게이트웨이 타임아웃 처리
                 wait_time = backoff_factor ** attempt  
                 print(f"Error {response.status_code}: Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{retries})")
                 time.sleep(wait_time)
