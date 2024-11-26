@@ -3,10 +3,11 @@ import spacy
 import pandas as pd
 from tqdm import tqdm
 
-from nltk.corpus import words
+from nltk.corpus import words, wordnet
 
 import nltk
 nltk.download('words')
+nltk.download('wordnet')
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -57,8 +58,9 @@ def filter_words(df):
     filtered = df[df['word'].str.match('^[a-zA-Z]+$')] 
     filtered1 = filtered[filtered['word'].str.len()>3]
     filtered2 = filtered1[~filtered1['word'].isin(english_words)].copy()
+    filtered3 = filtered2[filtered2['word'].apply(lambda x: len(wordnet.synsets(x))==0)].copy()
 
-    return filtered2
+    return filtered3
 
 def filter_archs(sentences):
 
