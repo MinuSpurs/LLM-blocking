@@ -3,7 +3,7 @@ import json
 import os
 import time
 
-def get_documents(query, maxnum=10, max_disp_len=200, retries=5, backoff_factor=2):
+def get_documents(query, maxnum=10, max_disp_len=200, retries=5, backoff_factor=2, timeout=30):
     url = "https://api.infini-gram.io/"
     payload = {
         "index": "v4_dolma-v1_7_llama",
@@ -15,21 +15,26 @@ def get_documents(query, maxnum=10, max_disp_len=200, retries=5, backoff_factor=
     
     for attempt in range(retries):
         try:
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=timeout)
             response.raise_for_status()
             return response.json()['documents']
         except requests.exceptions.HTTPError as e:
-            if response.status_code == 429:
+            if response.status_code in [429, 504]:  # 처리 제한 초과 및 게이트웨이 타임아웃 처리
                 wait_time = backoff_factor ** attempt  
-                print(f"Rate limit exceeded. Retrying in {wait_time} seconds...")
+                print(f"Error {response.status_code}: Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{retries})")
                 time.sleep(wait_time)
             else:
-                raise e  
+                print(f"HTTP Error: {e}")
+                break
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed: {e}")
+            break
+    
     print("Max retries reached. Failed to retrieve documents.")
     return None  
 
-def collect_unique_documents(query, file_path, batch_size=10, max_disp_len=200, target_count=6974, max_duplicate_attempts=10):
-    seen_doc_ix = set() 
+def collect_unique_documents(query, file_path, batch_size=10, max_disp_len=200, target_count=173269, max_duplicate_attempts=5):
+    seen_doc_ix = set()
     all_documents = []
     duplicate_count = 0
 
@@ -68,6 +73,6 @@ def collect_unique_documents(query, file_path, batch_size=10, max_disp_len=200, 
     
     print(f"Document collection completed. Total unique documents saved: {len(all_documents)}")
 
-file_path = "/home/work/jupyter/minwoo/CMU/LLM_blocking/data/is_not_a_term_doc.json"
+file_path = "/home/work/jupyter/minwoo/CMU/LLM_blocking/data/document/is_not_a_word_doc.json"
 
-collect_unique_documents("is not a term", file_path, batch_size=10, max_disp_len=200, target_count=49128)
+collect_unique_documents("is not a word", file_path, batch_size=10, max_disp_len=200, target_count=173269)
