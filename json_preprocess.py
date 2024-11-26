@@ -16,7 +16,7 @@ def extract_data(data, output_file, query="is a made up word"):
     
     ixs, word_list, texts = [], [], []
 
-    for document in tqdm(data):
+    for document in data:
         spans = document.get("spans", [])
         ix = document.get("doc_ix", [])
 
@@ -32,7 +32,7 @@ def extract_data(data, output_file, query="is a made up word"):
     
     sentences_with_query = [] 
 
-    for doc in docs:
+    for doc in tqdm(docs):
         for sentence in doc.sents:
             if query in sentence.text:
 
@@ -41,21 +41,22 @@ def extract_data(data, output_file, query="is a made up word"):
 
     # Save csv file
     df = pd.DataFrame()
-    df['doc_ix'] = ixs
     df['word'] = word_list
     df['sentence'] = sentences_with_query
+    df['doc_ix'] = ixs
     df.to_csv(output_file, index=False)
     print(f'Saved the csv file to {output_file}')
 
     return df
 
 
-# nltk filtering
+# csv filtering - only EN, length>3, not nltk word
 def filter_words(df):
     english_words = set(words.words())
 
     filtered = df[df['word'].str.match('^[a-zA-Z]+$')] 
-    filtered2 = filtered[~filtered['word'].isin(english_words)].copy()
+    filtered1 = filtered[filtered['word'].str.len()>3]
+    filtered2 = filtered1[~filtered1['word'].isin(english_words)].copy()
 
     return filtered2
 
@@ -110,7 +111,7 @@ def main():
         df1 = filter_words(df)
 
         # df1 = filter_archs(df1)
-        df1.to_csv(f'{csv_path.split('.csv')[0]}_filtered.csv', index=False)
+        df1.to_csv(f"{csv_path.split('.csv')[0]}_filtered.csv", index=False)
         print(f'Saving filtered csv file with len {len(df1)}')
 
         total.append(df1)
