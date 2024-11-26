@@ -3,13 +3,18 @@ import spacy
 import pandas as pd
 from tqdm import tqdm
 
+from nltk.corpus import words
+
+import nltk
+nltk.download('words')
+
 nlp = spacy.load("en_core_web_sm")
 
 
 # extracting a word and a sentence
 def extract_data(data, output_file, query="is a made up word"):
     
-    ixs, words, texts = [], [], []
+    ixs, word_list, texts = [], [], []
 
     for document in tqdm(data):
         spans = document.get("spans", [])
@@ -19,7 +24,7 @@ def extract_data(data, output_file, query="is a made up word"):
         text = " ".join([span[0] for span in spans])
 
         if word != [] and text != '':
-            words.append(word)
+            word_list.append(word.lower())
             texts.append(text)
             ixs.append(ix)
 
@@ -35,21 +40,24 @@ def extract_data(data, output_file, query="is a made up word"):
                 break
 
     # Save csv file
-
-    output_file = f"{output_file.split('.json')[0]}_sentence.csv"
-
     df = pd.DataFrame()
     df['doc_ix'] = ixs
-    df['word'] = words
+    df['word'] = word_list
     df['sentence'] = sentences_with_query
     df.to_csv(output_file, index=False)
+    print(f'Saved the csv file to {output_file}')
 
     return df
 
 
 # nltk filtering
-def filter_wordnet():
-    pass
+def filter_words(df):
+    english_words = set(words.words())
+
+    filtered = df[df['word'].str.match('^[a-zA-Z]+$')] 
+    filtered2 = filtered[~filtered['word'].isin(english_words)].copy()
+
+    return filtered2
 
 def filter_archs(sentences):
 
@@ -84,18 +92,35 @@ def filter_archs(sentences):
 def main():
 
     # expressions = ['is a made-up word', 'is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
+    total = []
+
     expressions = ['is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
-    
     for expression in expressions:
 
-        file_path = f"./data/finished/{'_'.join(expression.split())}.json"
+
+        json_path = f"./data/json/{'_'.join(expression.split())}.json"
+        csv_path = f"./data/csv/{'_'.join(expression.split())}.csv"
         
-        with open(file_path, "r") as file:
+        with open(json_path, "r") as file:
             data = json.load(file)
             print(f"Data count for '{expression}' : \t{len(data)}")
         
-        df = extract_data(data, file_path, query=expression)
-        # words = extract_not_words_from_sentences(sentences)
+        df = extract_data(data, csv_path, query=expression)
+
+        df1 = filter_words(df)
+
+        # df1 = filter_archs(df1)
+        df1.to_csv(f'{csv_path.split('.csv')[0]}_filtered.csv', index=False)
+        print(f'Saving filtered csv file with len {len(df1)}')
+
+        total.append(df1)
+
+    csv_path = f"./data/words/total_non_words.csv"
+    total_df = pd.concat(total, ignore_index=True)
+    total_df.to_csv(csv_path, index=False)
+
+
+
 
 main()
 
