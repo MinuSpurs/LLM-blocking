@@ -101,5 +101,4 @@ def main():
         collect_unique_documents(expression, f"./data/{'_'.join(expression.split())}.json", json_num=json_num, batch_size=10, max_disp_len=200, target_count=target_count)
 
 
-def __init__():
-    main()
+main()
