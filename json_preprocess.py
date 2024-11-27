@@ -6,8 +6,8 @@ from tqdm import tqdm
 from nltk.corpus import words, wordnet
 
 import nltk
-nltk.download('words')
-nltk.download('wordnet')
+#nltk.download('words')
+#nltk.download('wordnet')
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -62,46 +62,46 @@ def filter_words(df):
 
     return filtered3
 
-def filter_archs(sentences):
-
+def filter_archs(df, target_word):
     not_words = []
-    
-    for sentence in sentences:
-        doc = nlp(sentence)
+
+    for _, row in df.iterrows(): 
+        sentence = row['sentence']
+        doc_ix = row['doc_ix']
+        doc = nlp(sentence)  # Process the sentence using spaCy
+
         for token in doc:
-
-
-            # Identify the "word" token in the structure "X is not a word"
-            if token.text.lower() == "word" and token.dep_ == "attr":   # 문장이 바뀔때 수정해야함
-                # Check if "is" exists as an auxiliary verb right before "not"
+            # Check if the token matches the target word and is used as an attribute
+            if token.text.lower() == target_word and token.dep_ == "attr":
+                # Check for the "is not" structure
                 if token.head.text.lower() == "is" and any(child.text.lower() == "not" for child in token.head.children):
-                    # Identify "X" as the token immediately before "is"
+                    # Extract "X" from the structure "X is not a word"
                     is_token_index = token.head.i
                     if is_token_index > 0:
-                        x_token = doc[is_token_index - 1]
+                        x_token = doc[is_token_index - 1]  # Get the token representing "X"
                         x_word = x_token.text
 
-                        has_right_arcs = any(child.i > token.i for child in token.children)
+                        # Append the word, sentence, and doc_ix to the result
+                        print(f"Adding '{x_word}' to not_words list.")
+                        not_words.append((x_word, sentence, doc_ix))  # Include doc_ix in the tuple
 
-                        # Only apply basic checks for WordNet existence and stop words
-                        if not has_right_arcs and not is_real_word(x_word, x_token.tag_):
-                            print(f"Adding '{x_word}' to not_words list.")
-                            not_words.append((x_word, sentence))  # Save the word along with the original sentence
-                        else:
-                            print(f"Skipping '{x_word}' (exists in WordNet, is a common word/stop word, or is a proper noun).")
-    
-    return not_words
+    # Convert the not_words list into a DataFrame
+    filtered_df = pd.DataFrame(not_words, columns=['not_word', 'sentence', 'doc_ix'])
+    return filtered_df
+
 
 def main():
 
     # expressions = ['is a made-up word', 'is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
     total = []
 
-    expressions = ['is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
+    # expressions = ['is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
+    expressions = ['is not a real word']
     for expression in expressions:
 
+        target_word = expression.split()[-1]
 
-        json_path = f"./data/json/{'_'.join(expression.split())}.json"
+        json_path = "/home/work/jupyter/minwoo/CMU/LLM_blocking/data/document/is_not_a_real_word_doc.json"
         csv_path = f"./data/csv/{'_'.join(expression.split())}.csv"
         
         with open(json_path, "r") as file:
@@ -112,7 +112,7 @@ def main():
 
         df1 = filter_words(df)
 
-        # df1 = filter_archs(df1)
+        df1 = filter_archs(df1, target_word)
         df1.to_csv(f"{csv_path.split('.csv')[0]}_filtered.csv", index=False)
         print(f'Saving filtered csv file with len {len(df1)}')
 
