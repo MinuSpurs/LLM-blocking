@@ -68,7 +68,7 @@ def filter_archs(df, target_word):
     for _, row in df.iterrows(): 
         sentence = row['sentence']
         doc_ix = row['doc_ix']
-        doc = nlp(sentence)  # Process the sentence using spaCy
+        doc = nlp(sentence)
 
         for token in doc:
             # Check if the token matches the target word and is used as an attribute
@@ -82,10 +82,9 @@ def filter_archs(df, target_word):
                         x_word = x_token.text
 
                         # Append the word, sentence, and doc_ix to the result
-                        print(f"Adding '{x_word}' to not_words list.")
-                        not_words.append((x_word, sentence, doc_ix))  # Include doc_ix in the tuple
+                        print(f"Adding '{x_word}' to not_words list.")  # Handle comment if necessary
+                        not_words.append((x_word, sentence, doc_ix)) 
 
-    # Convert the not_words list into a DataFrame
     filtered_df = pd.DataFrame(not_words, columns=['not_word', 'sentence', 'doc_ix'])
     return filtered_df
 
