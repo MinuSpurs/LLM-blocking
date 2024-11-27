@@ -7,7 +7,7 @@ from nltk.corpus import words, wordnet
 
 import nltk
 #nltk.download('words')
-#nltk.download('wordnet')
+#nltk.download('wordnet')   # Remove comments as needed
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -95,8 +95,7 @@ def main():
     # expressions = ['is a made-up word', 'is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
     total = []
 
-    # expressions = ['is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
-    expressions = ['is not a real word']
+    expressions = ['is a made up word', 'is not a common word', 'is a created word', 'is an invented word'] # add expressions as needed
     for expression in expressions:
 
         target_word = expression.split()[-1]
