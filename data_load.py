@@ -3,7 +3,7 @@ import json
 import os
 import time
 
-def get_documents(query, maxnum=10, max_disp_len=200, retries=5, backoff_factor=2, timeout=30):
+def get_documents(query, maxnum=10, max_disp_len=200, retries=10, backoff_factor=2, timeout=30):
     url = "https://api.infini-gram.io/"
     payload = {
         "index": "v4_dolma-v1_7_llama",
@@ -33,7 +33,7 @@ def get_documents(query, maxnum=10, max_disp_len=200, retries=5, backoff_factor=
     print("Max retries reached. Failed to retrieve documents.")
     return None  
 
-def collect_unique_documents(query, file_path, batch_size=10, max_disp_len=200, target_count=173269, max_duplicate_attempts=5):
+def collect_unique_documents(query, file_path, batch_size=10, max_disp_len=200, target_count=173269, max_duplicate_attempts=10):
     seen_doc_ix = set()
     all_documents = []
     duplicate_count = 0
@@ -65,6 +65,7 @@ def collect_unique_documents(query, file_path, batch_size=10, max_disp_len=200, 
         else:
             all_documents.extend(new_documents)
             seen_doc_ix.update(doc['doc_ix'] for doc in new_documents)
+            duplicate_count = 0
             print(f"Collected {len(all_documents)} unique documents so far...")
 
         with open(file_path, 'w') as f:
