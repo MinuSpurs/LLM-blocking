@@ -42,7 +42,6 @@ def extract_data(data, output_file, query="is a made up word"):
     docs = nlp.pipe(texts, batch_size=100)  
     
     sentences_with_query = [] 
-
     for doc in tqdm(docs):
         for sentence in doc.sents:
             if query in sentence.text:
@@ -68,7 +67,7 @@ def save_filtered_and_removed(original_df, filtered_df, stage_name):
     filtered_df.to_csv(f"./data/csv/{stage_name}_filtered.csv", index=False)    
     removed_df.to_csv(f"./data/csv/{stage_name}_removed.csv", index=False)
     
-    print(f"{stage_name}: Filtered saved to {stage_name}_filtered.csv, Removed saved to {stage_name}_removed.csv")
+    # print(f"{stage_name}: Filtered saved to {stage_name}_filtered.csv, Removed saved to {stage_name}_removed.csv")
 
 
 
@@ -139,7 +138,7 @@ def main():
     """
 
     # Combine JSON files grouped by expressions into a single CSV file.
-    csv_path = f"./data/csv/total.csv"
+    total_csv_path = f"./data/csv/total.csv"
     if not os.path.isfile(csv_path):
 
         total = []
@@ -161,8 +160,10 @@ def main():
             total.append(df)
 
         total_df = pd.concat(total, ignore_index=True)
-        total_df.to_csv(csv_path, index=False)
-        print(f"Total data saved to {csv_path} of length {len(total_df)}")
+        print('raw data total', len(total_df))
+        total_df = total_df.drop_duplicates()
+        total_df.to_csv(total_csv_path, index=False)
+        print(f"Total data saved to {total_csv_path} of length {len(total_df)}")
 
 
     # Word filtering
