@@ -6,6 +6,12 @@ This repository provides tools for managing Dolma JSON files and preparing data 
 
 ---
 
+### Download Processed Data
+
+- **Filtered Words Dataset** : [Download here](https://drive.google.com/drive/folders/1d5ptR5YO51FDuI8RxqJNFKFI8ku83vZu?usp=sharing)
+- **Frequency Analysis Results** : [Download here](https://drive.google.com/drive/folders/1d5ptR5YO51FDuI8RxqJNFKFI8ku83vZu?usp=sharing)
+
+
 ### 1. JSON Request
 
 - Use one of the data_load files to collect JSON files
@@ -51,3 +57,4 @@ This repository provides tools for managing Dolma JSON files and preparing data 
     └── frequency.py
 
     ```
+
