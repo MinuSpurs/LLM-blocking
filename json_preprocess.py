@@ -139,7 +139,7 @@ def main():
 
     # Combine JSON files grouped by expressions into a single CSV file.
     total_csv_path = f"./data/csv/total.csv"
-    if not os.path.isfile(csv_path):
+    if not os.path.isfile(total_csv_path):
 
         total = []
         expressions = ['is a created word', 'is a made up word']  # Add more expressions as needed
@@ -182,8 +182,13 @@ def main():
     df4 = filter_levenshtein(df3, dictionary)
     save_filtered_and_removed(df3, df4, "filter_levenshtein")
 
+
     df4.to_csv(f"./data/words/total_non_words.csv", index=False)
-    print(f"Saving filtered CSV with len {len(df4)}")
+
+    df_dedup = df4.drop_duplicates(subset='word', keep='first')
+    df_dedup[['word', 'sentence']].to_csv(f"./data/words/total_non_words_dedup.csv")
+    print(f"Final word list : len {len(df4)} \n Dedupliated word list : {len(df_dedup)}")
+
 
 
 main()
