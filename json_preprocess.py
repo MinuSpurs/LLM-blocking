@@ -99,9 +99,13 @@ def filter_archs(df, target_word):
                         x_token = doc[is_token_index - 1]  # Get the token representing "X"
                         x_word = x_token.text
 
-                        # Append the word, sentence, and doc_ix to the result
-                        # print(f"Adding '{x_word}' to not_words list.")  # Handle comment if necessary
-                        not_words.append((x_word, sentence, doc_ix)) 
+                        # Check for right arcs
+                        has_right_arcs = any(child.i > token.i for child in token.children)
+                        if not has_right_arcs:
+                            # Only add if there are no right arcs
+                            not_words.append((x_word, sentence, doc_ix))
+                        else:
+                            print(f"Skipping '{x_word}' due to right arcs.")
 
     filtered_df = pd.DataFrame(not_words, columns=['word', 'sentence', 'doc_ix'])
     return filtered_df
