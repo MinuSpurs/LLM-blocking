@@ -27,6 +27,7 @@ def get_frequency(words):
     counts = []
     for word in words:
         counts.append(get_count(word))
+    return counts
     
 
 
