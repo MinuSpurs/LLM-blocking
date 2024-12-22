@@ -2,20 +2,26 @@ import json
 import spacy
 import pandas as pd
 from tqdm import tqdm
-from hunspell import Hunspell
+# from hunspell import Hunspell
 import Levenshtein
 from nltk.corpus import words, wordnet
 import nltk
 import os
+import re 
+from spellchecker import SpellChecker
 
-#nltk.download('words')
-#nltk.download('wordnet')   # Remove comments as needed
+
+# nltk.download('words')
+# nltk.download('wordnet')   # Remove comments as needed
+
+spell = SpellChecker()
 
 # Hunspell setup
 # h = Hunspell('/usr/share/hunspell/en_US.dic', '/usr/share/hunspell/en_US.aff')
-h = Hunspell()
+# h = Hunspell()
 
-with open('/usr/share/hunspell/en_US.dic', 'r') as file:
+# Load dictionary from the en_US.dic file
+with open('/Users/minwoo/Library/Spelling/en_US.dic', 'r', encoding='latin1') as file:
     dictionary = [line.strip() for line in file.readlines() if line.strip()]
 
 
@@ -67,7 +73,7 @@ def save_filtered_and_removed(original_df, filtered_df, stage_name):
     filtered_df.to_csv(f"./data/csv/{stage_name}_filtered.csv", index=False)    
     removed_df.to_csv(f"./data/csv/{stage_name}_removed.csv", index=False)
     
-    # print(f"{stage_name}: Filtered saved to {stage_name}_filtered.csv, Removed saved to {stage_name}_removed.csv")
+    print(f"{stage_name}: Filtered {len(filtered_df)} words, Removed {len(removed_df)} words.")
 
 
 
@@ -111,8 +117,13 @@ def filter_archs(df):
     return df.loc[not_words]
 
 
-def filter_hunspell(df):
+'''def filter_hunspell(df):
     df = df[df['word'].apply(lambda x : True if not h.spell(x) else False)].copy()
+    return df'''
+
+def filter_spellchecker(df):
+    # When you can't use Hunspell, use spellchecker
+    df = df[df['word'].apply(lambda x: len(spell.known([x])) > 0)].copy()
     return df
 
 
@@ -120,33 +131,112 @@ def filter_levenshtein(df, dictionary, threshold=2):
 
     flags = []
     for word in df['word']:
-        
         closest_word = min(dictionary, key=lambda x: Levenshtein.distance(word, x))
         distance = Levenshtein.distance(word, closest_word)
 
-        if distance > threshold:
+        if distance <= threshold:  
             flags.append(True)
         else:
             flags.append(False)
 
     return df[flags]
 
+eng_file = "./data/unimorph/eng/eng.txt"
+derivations_file = "./data/unimorph/eng/eng.derivations.tsv"
+segmentations_file = "./data/unimorph/eng/eng.segmentations"
+args_file = "./data/unimorph/eng/eng.args"
+dictionary_file = "./data/spelling/en_US.dic"
+
+
+def clean_text(text):
+    """소문자로 변환하고 특수문자 및 공백 제거"""
+    if isinstance(text, str):
+        return re.sub(r'[^a-z0-9]', '', text.lower())
+    else:
+        return "" 
+
+def load_unimorph_dataset(file_path):
+    """Load UniMorph dataset (eng.txt) into a DataFrame."""
+    df = pd.read_csv(file_path, sep="\t", header=None, names=["word", "lemma", "features"])
+    df["word"] = df["word"].apply(clean_text)
+    df["lemma"] = df["lemma"].apply(clean_text)
+    return df
+
+def load_derivations(file_path):
+    """Load derivational relationships from eng.derivations.tsv."""
+    df = pd.read_csv(file_path, sep="\t", header=None, names=["base", "derived", "relation"])
+    df["base"] = df["base"].apply(clean_text)
+    df["derived"] = df["derived"].apply(clean_text)
+    return df
+
+def load_segmentations(file_path):
+    """Load word segmentations from eng.segmentations."""
+    segmentations = {}
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            parts = line.strip().split("\t")
+            if len(parts) >= 2:
+                word = clean_text(parts[0]) 
+                segmentation = clean_text(parts[1])
+                segmentations[word] = segmentation
+    return segmentations
+
+def load_args(file_path):
+    """Load additional metadata or arguments from eng.args."""
+    with open(file_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+        return clean_text(content)
+
+def filter_unimorph(df, unimorph_df):
+    """
+    Filter words based on their presence in the UniMorph dataset.
+    Remove any word that exists in the UniMorph lemma list.
+    """
+    valid_words = set(unimorph_df['lemma'])
+    filtered_df = df[~df['word'].apply(clean_text).isin(valid_words)].copy()
+    
+    print(f"Words removed after UniMorph filtering: {len(df) - len(filtered_df)}")
+    return filtered_df
+
 
 def main():
     """
     Main function to process JSON data and filter words.
     """
+    os.makedirs("./data/csv", exist_ok=True)
+    os.makedirs("./data/words", exist_ok=True)
+
+    unimorph_df = load_unimorph_dataset(eng_file)
+    with open(dictionary_file, 'r', encoding='latin1') as file:
+        dictionary = [line.strip() for line in file.readlines() if line.strip()]
 
     # Combine JSON files grouped by expressions into a single CSV file.
     total_csv_path = f"./data/csv/total.csv"
-    if not os.path.isfile(total_csv_path):
+    if os.path.isfile(total_csv_path):
+        print(f"Loading existing total CSV from {total_csv_path}")
+        total_df = pd.read_csv(total_csv_path)
+
+        # NaN 값이 있는 행 찾기
+        nan_rows = total_df[total_df.isna().any(axis=1)]
+
+        if not nan_rows.empty:
+            print("Rows with NaN values detected and will be removed:")
+            print(nan_rows)
+
+            # NaN이 있는 행 삭제
+            total_df = total_df.dropna()
+            print(f"NaN values removed. Total data length after cleanup: {len(total_df)}")
+        else:
+            print("No NaN values found in the total CSV.")
+
+        print(f"Loaded total data of length: {len(total_df)}")
+    else:
 
         total = []
-        expressions = ['is a created word', 'is a made up word']  # Add more expressions as needed
+        expressions = ['is a created word']  # Add more expressions as needed
         # expressions = ['is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
         for expression in expressions:
             
-
             json_path = f"./data/json/{'_'.join(expression.split())}.json"
             csv_path = f"./data/csv/{'_'.join(expression.split())}.csv"
 
@@ -165,7 +255,6 @@ def main():
         total_df.to_csv(total_csv_path, index=False)
         print(f"Total data saved to {total_csv_path} of length {len(total_df)}")
 
-
     # Word filtering
 
     df = total_df.copy()
@@ -176,19 +265,22 @@ def main():
     df2 = filter_archs(df1)
     save_filtered_and_removed(df1, df2, "filter_archs")
     
-    df3 = filter_hunspell(df2)
-    save_filtered_and_removed(df2, df3, "filter_hunspell")
+    '''df3 = filter_hunspell(df2)
+    save_filtered_and_removed(df2, df3, "filter_hunspell")'''
+
+    df3 = filter_spellchecker(df2)
+    save_filtered_and_removed(df2, df3, "filter_spellchecker")
     
     df4 = filter_levenshtein(df3, dictionary)
     save_filtered_and_removed(df3, df4, "filter_levenshtein")
 
+    df5 = filter_unimorph(df4, unimorph_df)
+    save_filtered_and_removed(df4, df5, "filter_unimorph")
 
-    df4.to_csv(f"./data/words/total_non_words.csv", index=False)
+    df5.to_csv(f"./data/words/total_non_words.csv", index=False)
 
-    df_dedup = df4.drop_duplicates(subset='word', keep='first')
+    df_dedup = df5.drop_duplicates(subset='word', keep='first')
     df_dedup[['word', 'sentence']].to_csv(f"./data/words/total_non_words_dedup.csv")
-    print(f"Final word list : len {len(df4)} \n Dedupliated word list : {len(df_dedup)}")
-
-
+    print(f"Final word list : len {len(df5)} \n Dedupliated word list : {len(df_dedup)}")
 
 main()
