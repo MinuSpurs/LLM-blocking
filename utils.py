@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 
 def clean_text(text):
     """lowercase, only english and numbers """
@@ -37,44 +38,37 @@ def load_args(file_path):
         return clean_text(content)
 
 
-def save_filtered_and_removed(original_df, filtered_df, stage_name):    
+def save_filtered_and_removed(original_df, filtered_df, stage_name):
+    filtering_dir = './data/filtering/'    
+    os.makedirs(filtering_dir, exist_ok=True)
 
     removed_df = original_df[~original_df.index.isin(filtered_df.index)]
     
-    filtered_df.to_csv(f"./data/csv/{stage_name}_filtered.csv", index=False)    
-    removed_df.to_csv(f"./data/csv/{stage_name}_removed.csv", index=False)
+    filtered_df.to_csv(f"{filtering_dir}/{stage_name}_filtered.csv", index=False)    
+    removed_df.to_csv(f"{filtering_dir}/{stage_name}_removed.csv", index=False)
     
     print(f"{stage_name}: Filtered {len(filtered_df)} words, Removed {len(removed_df)} words.")
 
 
 
-class SpellChecking():
-    def __init__(self, spellchecker_types):
-        """
-        Initializes the spell checkers
+class HunspellHandler:
+    def __init__(self):
+        from hunspell import Hunspell
+        self.hspell = Hunspell('en_US')
 
-        Args:
-            spellchecker_types (list of str) : List of spellchecker types to use.
-        """
-        self.spellcheckers = {}
-        
-        for spellchecker_type in spellchecker_types:
-            if spellchecker_type == 'spellchecker':
-                from spellchecker import SpellChecker
-                self.spellcheckers['spellchecker'] = SpellChecker()
+    def is_misspelled(self, word):
+        return not self.hspell.spell(word)
 
-            elif spellchecker_type == 'hunspell':
-                from hunspell import Hunspell
-                self.spellcheckers['hunspell'] = Hunspell('en_US')
-    
-    def is_misspelled(self, word, spell_checker):
-        if spell_checker == 'spellchecker':
-                return len(self.spellcheckers[spell_checker].known([word])) > 0
-        if spell_checker == 'hunspell':
-                return not self.spellcheckers[spell_checker].spell(word)
+    def suggest(self, word):
+        return self.hspell.suggest(word)
 
-    
+class SpellCheckerHandler:
+    def __init__(self):
+        from spellchecker import SpellChecker
+        self.spell = SpellChecker()
 
+    def is_misspelled(self, word):
+        return not self.spell.known([word])
 
-        
-        
+    def suggest(self, word):
+        return self.spell.candidates(word)

@@ -98,32 +98,49 @@ def filter_archs(df):
     return df.loc[not_words]
 
 
+def is_word_or_typos(words, spellchecker, threshold=1):
+    if spellchecker=='hunspell':
+        handler = HunspellHandler()
+    elif spellchecker=='spellchecker':
+        handler = SpellCheckerHandler()
+
+    word_or_typos = []
+
+    for word in tqdm(words):
+        word_typo = True
+        if handler.is_misspelled(word):  # not a word (can be a typo or a non-word)
+            suggestions = handler.suggest(word)
+        
+            if suggestions:
+                distance = Levenshtein.distance(word, list(suggestions)[0])
+                if distance > threshold:  # not a word, not a typo
+                    word_typo = False
+            else:
+                word_typo = False  # not a word, not a typo
+
+
+        word_or_typos.append(word_typo)
+
+    return word_or_typos
+
+
 def filter_spellchecker(df, spellchecker_types):
-    print(spellchecker_types)
-    spellchecking = SpellChecking(spellchecker_types)
-    for spellchecker in spellchecker_types:
-        df = df[df['word'].apply(lambda x : spellchecking.is_misspelled(x, spellchecker))]
+    spellchecker_dir = './data/csv/spellchecker_removed/'
+    os.makedirs(spellchecker_dir)
+    for sc_type in spellchecker_types:
+        print('Using Spellchecker: ', sc_type)
+        word_or_typos = is_word_or_typos(df['word'], sc_type, threshold=1)
+        df[word_or_typos].to_csv(f'{spellchecker_dir}/{sc_type}.csv')
+        df = df[[not w_t for w_t in word_or_typos]].copy()
+        print('kept: ', len(df), 'discarded: ', sum(word_or_typos))
     return df
 
 
-def filter_levenshtein(df, dictionary, threshold=2):
-
-    flags = []
-    for word in df['word']:
-        closest_word = min(dictionary, key=lambda x: Levenshtein.distance(word, x))
-        distance = Levenshtein.distance(word, closest_word)
-
-        if distance <= threshold:  
-            flags.append(True)
-        else:
-            flags.append(False)
-
-    return df[flags]
 
 def filter_wiki(df):
 
     def is_wiki(word):
-        searched = wikipedia.search(word)
+        searched = wikipedia.search(word)[:3]
         if len(searched)==0:
             return False
         
@@ -131,15 +148,13 @@ def filter_wiki(df):
             if word in s.lower():
                 return True
         return False
+    
+    is_wikis = []
+    for word in tqdm(df['word']):
+        is_wikis.append(is_wiki(word))
 
-    return df[~df['word'].apply(is_wiki)]
 
-
-
-dictionary_file = "./data/spelling/en_US.dic" 
-with open(dictionary_file, 'r', encoding='latin1') as file:
-    dictionary = [line.strip() for line in file.readlines() if line.strip()]  
-
+    return df[[not i for i in is_wikis]]
 
 
 def load_unimorph_dataset(file_path):
@@ -173,8 +188,9 @@ def main():
     total_csv_path = f"./data/csv/total.csv"
     if not os.path.isfile(total_csv_path):
         total = []
-        expressions = ['is a created word']  # Add more expressions as needed
-        # expressions = ['is a made up word', 'is not a common word', 'is a created word', 'is an invented word']
+        # expressions = ['is a created word']  # Add more expressions as needed
+        expressions = ['is a made up word', 'is a made-up word', 'is a created word', 'is not a common word',\
+                        'is an invented word', 'is not a real word', 'is not a term', 'is not a word']
         for expression in expressions:
             
             json_path = f"./data/json/{'_'.join(expression.split())}.json"
@@ -198,8 +214,10 @@ def main():
     else:
         print(f"Loading existing total CSV from {total_csv_path}")
         total_df = pd.read_csv(total_csv_path)
+        total_df = total_df.dropna()
+        total_df = total_df.reset_index(drop=True)
 
-
+    import pdb;pdb.set_trace()
 
     # Word filtering
     df = total_df.copy()
@@ -210,33 +228,25 @@ def main():
     df2 = filter_archs(df1)
     save_filtered_and_removed(df1, df2, "filter_archs")
     
-    '''df3 = filter_hunspell(df2)
-    save_filtered_and_removed(df2, df3, "filter_hunspell")'''
 
-    df3 = filter_spellchecker(df2)
+    df3 = filter_spellchecker(df2, ['hunspell', 'spellchecker'])
     save_filtered_and_removed(df2, df3, "filter_spellchecker")
     
-    # Load dictionary from the en_US.dic file
-    with open('./Library/Spelling/en_US.dic', 'r', encoding='latin1') as file:
-        dictionary = [line.strip() for line in file.readlines() if line.strip()]
 
-    df4 = filter_levenshtein(df3, dictionary)
-    save_filtered_and_removed(df3, df4, "filter_levenshtein")
-
-    df5 = filter_wiki(df4)
-    save_filtered_and_removed(df4, df5, "filter_wiki")
+    df4 = filter_wiki(df3)
+    save_filtered_and_removed(df3, df4, "filter_wiki")
 
     eng_file = "./data/unimorph/eng/eng.txt"
     unimorph_df = load_unimorph_dataset(eng_file)
-    df6 = filter_unimorph(df5, unimorph_df)
-    save_filtered_and_removed(df5, df6, "filter_unimorph")
+    df5 = filter_unimorph(df4, unimorph_df)
+    save_filtered_and_removed(df4, df5, "filter_unimorph")
 
     os.makedirs("./data/words", exist_ok=True)
-    df6.to_csv(f"./data/words/total_non_words.csv", index=False)
+    df5.to_csv(f"./data/words/total_non_words.csv", index=False)
 
-    df_dedup = df6.drop_duplicates(subset='word', keep='first')
+    df_dedup = df5.drop_duplicates(subset='word', keep='first')
     df_dedup[['word', 'sentence']].to_csv(f"./data/words/total_non_words_dedup.csv", index=False)
-    print(f"Final word list : len {len(df6)} \n Dedupliated word list : len {len(df_dedup)}")
+    print(f"Final word list : len {len(df5)} \n Dedupliated word list : len {len(df_dedup)}")
 
 if __name__ == "__main__":
     main()
