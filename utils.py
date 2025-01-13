@@ -1,41 +1,13 @@
 import pandas as pd
 import os
+import re
 
 def clean_text(text):
     """lowercase, only english and numbers """
     if isinstance(text, str):
-        return re.sub(r'[^a-z0-9]', '', text.lower())
+        return re.sub(r'[^a-z]', '', text.lower())
     else:
         return "" 
-
-derivations_file = "./data/unimorph/eng/eng.derivations.tsv"
-segmentations_file = "./data/unimorph/eng/eng.segmentations"
-args_file = "./data/unimorph/eng/eng.args"
-
-def load_derivations(file_path):
-    """Load derivational relationships from eng.derivations.tsv."""
-    df = pd.read_csv(file_path, sep="\t", header=None, names=["base", "derived", "relation"])
-    df["base"] = df["base"].apply(clean_text)
-    df["derived"] = df["derived"].apply(clean_text)
-    return df
-
-def load_segmentations(file_path):
-    """Load word segmentations from eng.segmentations."""
-    segmentations = {}
-    with open(file_path, 'r', encoding='utf-8') as file:
-        for line in file:
-            parts = line.strip().split("\t")
-            if len(parts) >= 2:
-                word = clean_text(parts[0]) 
-                segmentation = clean_text(parts[1])
-                segmentations[word] = segmentation
-    return segmentations
-
-def load_args(file_path):
-    """Load additional metadata or arguments from eng.args."""
-    with open(file_path, 'r', encoding='utf-8') as file:
-        content = file.read()
-        return clean_text(content)
 
 
 def save_filtered_and_removed(original_df, filtered_df, stage_name):
@@ -50,6 +22,14 @@ def save_filtered_and_removed(original_df, filtered_df, stage_name):
     print(f"{stage_name}: Filtered {len(filtered_df)} words, Removed {len(removed_df)} words.")
 
 
+def load_unimorph_dataset(file_path):
+    """Load UniMorph dataset (eng.txt) into a DataFrame."""
+    df = pd.read_csv(file_path, sep="\t", header=None, names=["word", "lemma", "features"])
+    df["word"] = df["word"].apply(clean_text)
+    df["lemma"] = df["lemma"].apply(clean_text)
+    df = df.dropna()
+    return df
+
 
 class HunspellHandler:
     def __init__(self):
@@ -61,6 +41,7 @@ class HunspellHandler:
 
     def suggest(self, word):
         return self.hspell.suggest(word)
+
 
 class SpellCheckerHandler:
     def __init__(self):

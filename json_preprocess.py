@@ -56,18 +56,19 @@ def extract_data(data, output_file, query="is a made up word"):
     return df
 
 
-# csv filtering - only EN, length>3, 3> consecutive letters, not nltk word, wordnet
+# csv filtering - only EN, 23>length>3, 3> consecutive letters, not nltk word, wordnet
 def filter_words(df):
     english_words = set(words.words())
     consecutive_pattern = r'(.)\1{2,}' 
 
     filtered = df[df['word'].str.match('^[a-zA-Z]+$')]
-    filtered1 = filtered[filtered['word'].str.len()>3]
+    filtered1 = filtered[filtered['word'].str.len().between(4, 22)]
     filtered2 = filtered1[filtered1['word'].apply(lambda x: not bool(re.search(consecutive_pattern, x)))]
     filtered2 = filtered2[~filtered2['word'].isin(english_words)].copy()
     filtered3 = filtered2[filtered2['word'].apply(lambda x: len(wordnet.synsets(x))==0)].copy()
 
     return filtered3
+
 
 def filter_archs(df):
 
@@ -125,7 +126,7 @@ def is_word_or_typos(words, spellchecker, threshold=1):
 
 
 def filter_spellchecker(df, spellchecker_types):
-    spellchecker_dir = './data/csv/spellchecker_removed/'
+    spellchecker_dir = './data/filtering/spellchecker_removed/'
     os.makedirs(spellchecker_dir)
     for sc_type in spellchecker_types:
         print('Using Spellchecker: ', sc_type)
@@ -157,20 +158,13 @@ def filter_wiki(df):
     return df[[not i for i in is_wikis]]
 
 
-def load_unimorph_dataset(file_path):
-    """Load UniMorph dataset (eng.txt) into a DataFrame."""
-    df = pd.read_csv(file_path, sep="\t", header=None, names=["word", "lemma", "features"])
-    df["word"] = df["word"].apply(clean_text)
-    df["lemma"] = df["lemma"].apply(clean_text)
-    df = df.dropna()
-    return df
 
 def filter_unimorph(df, unimorph_df):
     """
     Filter words based on their presence in the UniMorph dataset.
     Remove any word that exists in the UniMorph lemma list.
     """
-    valid_words = set(unimorph_df['lemma'])
+    valid_words = set(unimorph_df['lemma']).union(set(unimorph_df['word']))
     filtered_df = df[~df['word'].apply(clean_text).isin(valid_words)].copy()
     
     print(f"Words removed after UniMorph filtering: {len(df) - len(filtered_df)}")
@@ -217,29 +211,30 @@ def main():
         total_df = total_df.dropna()
         total_df = total_df.reset_index(drop=True)
 
-    import pdb;pdb.set_trace()
 
     # Word filtering
     df = total_df.copy()
     df1 = filter_words(df)
-    save_filtered_and_removed(df, df1, "filter_words")
+    save_filtered_and_removed(df, df1, "words")
     
     
     df2 = filter_archs(df1)
-    save_filtered_and_removed(df1, df2, "filter_archs")
+    save_filtered_and_removed(df1, df2, "archs")
     
 
     df3 = filter_spellchecker(df2, ['hunspell', 'spellchecker'])
-    save_filtered_and_removed(df2, df3, "filter_spellchecker")
+    save_filtered_and_removed(df2, df3, "spell_checker")
     
 
     df4 = filter_wiki(df3)
-    save_filtered_and_removed(df3, df4, "filter_wiki")
+    save_filtered_and_removed(df3, df4, "wiki")
+
+
 
     eng_file = "./data/unimorph/eng/eng.txt"
     unimorph_df = load_unimorph_dataset(eng_file)
     df5 = filter_unimorph(df4, unimorph_df)
-    save_filtered_and_removed(df4, df5, "filter_unimorph")
+    save_filtered_and_removed(df4, df5, "unimorph")
 
     os.makedirs("./data/words", exist_ok=True)
     df5.to_csv(f"./data/words/total_non_words.csv", index=False)
