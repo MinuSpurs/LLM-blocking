@@ -1,6 +1,7 @@
 import requests
 import time
 import pandas as pd
+from tqdm import tqdm
 
 def get_count(query, retries=5, backoff_factor=2):
     url = "https://api.infini-gram.io/"
@@ -20,12 +21,12 @@ def get_count(query, retries=5, backoff_factor=2):
             print(f"Rate limit exceeded. Retrying in {wait_time} seconds...")
             time.sleep(wait_time)
     print("Max retries reached. Failed to retrieve documents.")
-    return []
+    return 0
 
 
 def get_frequency(words):
     counts = []
-    for word in words:
+    for word in tqdm(words):
         counts.append(get_count(word))
     return counts
     
