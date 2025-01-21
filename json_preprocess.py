@@ -8,6 +8,7 @@ from nltk.corpus import words, wordnet
 import nltk
 import os
 import re 
+import requests
 import wikipedia
 
 
@@ -20,7 +21,6 @@ nlp = spacy.load("en_core_web_sm")
 
 # extracting a word and a sentence
 def extract_data(data, output_file, query="is a made up word"):
-    
     ixs, word_list, texts = [], [], []
 
     for document in data:
@@ -36,12 +36,11 @@ def extract_data(data, output_file, query="is a made up word"):
             ixs.append(ix)
 
     docs = nlp.pipe(texts, batch_size=100)  
-    
+
     sentences_with_query = [] 
     for doc in tqdm(docs):
         for sentence in doc.sents:
             if query in sentence.text:
-
                 sentences_with_query.append(sentence.text.strip())
                 break
 
@@ -127,7 +126,7 @@ def is_word_or_typos(words, spellchecker, threshold=1):
 
 def filter_spellchecker(df, spellchecker_types):
     spellchecker_dir = './data/filtering/spellchecker_removed/'
-    os.makedirs(spellchecker_dir)
+    os.makedirs(spellchecker_dir, exist_ok=True)
     for sc_type in spellchecker_types:
         print('Using Spellchecker: ', sc_type)
         word_or_typos = is_word_or_typos(df['word'], sc_type, threshold=1)
@@ -170,23 +169,39 @@ def filter_unimorph(df, unimorph_df):
     print(f"Words removed after UniMorph filtering: {len(df) - len(filtered_df)}")
     return filtered_df
 
+def is_valid_word_mw(word, api_key):
+    url = f"https://dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={api_key}"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        if isinstance(data, list) and len(data) > 0:
+            if isinstance(data[0], dict) and 'meta' in data[0]:
+                return True 
+    return False 
+
+def filter_merriam_webster(df, api_key):
+    valid_words = []
+    for word in tqdm(df['word'], desc="Filtering with Merriam-Webster"):
+        if is_valid_word_mw(word, api_key):
+            valid_words.append(word)
+
+    return df[~df['word'].isin(valid_words)]
+
 
 def main():
-    """
-    Main function to process JSON data and filter words.
-    """
-
     os.makedirs("./data/csv", exist_ok=True)
+
+    API_KEY = "YOUR_API_KEY"
 
     # Combine JSON files grouped by expressions into a single CSV file.
     total_csv_path = f"./data/csv/total.csv"
     if not os.path.isfile(total_csv_path):
         total = []
-        # expressions = ['is a created word']  # Add more expressions as needed
-        expressions = ['is a made up word', 'is a made-up word', 'is a created word', 'is not a common word',\
-                        'is an invented word', 'is not a real word', 'is not a term', 'is not a word']
+        expressions = ['is a made up word', 'is a made-up word', 'is a created word', 
+                       'is not a common word', 'is an invented word', 
+                       'is not a real word', 'is not a term', 'is not a word']
         for expression in expressions:
-            
             json_path = f"./data/json/{'_'.join(expression.split())}.json"
             csv_path = f"./data/csv/{'_'.join(expression.split())}.csv"
 
@@ -196,45 +211,33 @@ def main():
 
             df = extract_data(data, csv_path, query=expression)
             df['expression'] = [expression] * len(df)
-            
             total.append(df)
 
         total_df = pd.concat(total, ignore_index=True)
         print('raw data total', len(total_df))
-        total_df = total_df.dropna()
-        total_df = total_df.drop_duplicates() # deleting duplicates for exact same rows
+        total_df = total_df.dropna().drop_duplicates()
         total_df.to_csv(total_csv_path, index=False)
         print(f"Total data saved to {total_csv_path} of length {len(total_df)}")
     else:
         print(f"Loading existing total CSV from {total_csv_path}")
-        total_df = pd.read_csv(total_csv_path)
-        total_df = total_df.dropna()
-        total_df = total_df.reset_index(drop=True)
-
+        total_df = pd.read_csv(total_csv_path).dropna().reset_index(drop=True)
 
     # Word filtering
     df = total_df.copy()
     df1 = filter_words(df)
     save_filtered_and_removed(df, df1, "words")
-    
-    
+
     df2 = filter_archs(df1)
     save_filtered_and_removed(df1, df2, "archs")
-    
 
-    df3 = filter_spellchecker(df2, ['hunspell', 'spellchecker'])
+    df3 = filter_spellchecker(df2, ['spellchecker'])
     save_filtered_and_removed(df2, df3, "spell_checker")
-    
 
     df4 = filter_wiki(df3)
     save_filtered_and_removed(df3, df4, "wiki")
 
-
-
-    eng_file = "./data/unimorph/eng/eng.txt"
-    unimorph_df = load_unimorph_dataset(eng_file)
-    df5 = filter_unimorph(df4, unimorph_df)
-    save_filtered_and_removed(df4, df5, "unimorph")
+    df5 = filter_merriam_webster(df4, API_KEY)
+    save_filtered_and_removed(df4, df5, "merriam_webster")
 
     os.makedirs("./data/words", exist_ok=True)
     df5.to_csv(f"./data/words/total_non_words.csv", index=False)
@@ -242,6 +245,7 @@ def main():
     df_dedup = df5.drop_duplicates(subset='word', keep='first')
     df_dedup[['word', 'sentence']].to_csv(f"./data/words/total_non_words_dedup.csv", index=False)
     print(f"Final word list : len {len(df5)} \n Dedupliated word list : len {len(df_dedup)}")
+
 
 if __name__ == "__main__":
     main()
