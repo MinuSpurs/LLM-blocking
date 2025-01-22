@@ -3,6 +3,7 @@ import spacy
 import pandas as pd
 from tqdm import tqdm
 from utils import *
+from personal import API_KEY
 import Levenshtein
 from nltk.corpus import words, wordnet
 import nltk
@@ -118,7 +119,6 @@ def is_word_or_typos(words, spellchecker, threshold=1):
             else:
                 word_typo = False  # not a word, not a typo
 
-
         word_or_typos.append(word_typo)
 
     return word_or_typos
@@ -153,23 +153,10 @@ def filter_wiki(df):
     for word in tqdm(df['word']):
         is_wikis.append(is_wiki(word))
 
-
     return df[[not i for i in is_wikis]]
 
 
-
-def filter_unimorph(df, unimorph_df):
-    """
-    Filter words based on their presence in the UniMorph dataset.
-    Remove any word that exists in the UniMorph lemma list.
-    """
-    valid_words = set(unimorph_df['lemma']).union(set(unimorph_df['word']))
-    filtered_df = df[~df['word'].apply(clean_text).isin(valid_words)].copy()
-    
-    print(f"Words removed after UniMorph filtering: {len(df) - len(filtered_df)}")
-    return filtered_df
-
-def is_valid_word_mw(word, api_key):
+def is_dictonary(word, api_key):
     url = f"https://dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={api_key}"
     response = requests.get(url)
 
@@ -180,10 +167,10 @@ def is_valid_word_mw(word, api_key):
                 return True 
     return False 
 
-def filter_merriam_webster(df, api_key):
+def filter_dictionary(df, api_key):
     valid_words = []
     for word in tqdm(df['word'], desc="Filtering with Merriam-Webster"):
-        if is_valid_word_mw(word, api_key):
+        if is_dictonary(word, api_key):
             valid_words.append(word)
 
     return df[~df['word'].isin(valid_words)]
@@ -191,8 +178,6 @@ def filter_merriam_webster(df, api_key):
 
 def main():
     os.makedirs("./data/csv", exist_ok=True)
-
-    API_KEY = "YOUR_API_KEY"
 
     # Combine JSON files grouped by expressions into a single CSV file.
     total_csv_path = f"./data/csv/total.csv"
@@ -230,14 +215,14 @@ def main():
     df2 = filter_archs(df1)
     save_filtered_and_removed(df1, df2, "archs")
 
-    df3 = filter_spellchecker(df2, ['spellchecker'])
+    df3 = filter_spellchecker(df2, ['hunspell', 'spellchecker'])
     save_filtered_and_removed(df2, df3, "spell_checker")
 
     df4 = filter_wiki(df3)
     save_filtered_and_removed(df3, df4, "wiki")
 
-    df5 = filter_merriam_webster(df4, API_KEY)
-    save_filtered_and_removed(df4, df5, "merriam_webster")
+    df5 = filter_dictionary(df4, API_KEY)
+    save_filtered_and_removed(df4, df5, "dictionary")
 
     os.makedirs("./data/words", exist_ok=True)
     df5.to_csv(f"./data/words/total_non_words.csv", index=False)

@@ -1,3 +1,4 @@
 /data/*
 /dump
 /__pycache__
+personal.py
