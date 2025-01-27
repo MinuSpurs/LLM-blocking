@@ -3,7 +3,7 @@ import spacy
 import pandas as pd
 from tqdm import tqdm
 from utils import *
-from personal import API_KEY
+from personal import collegiate_key, medical_key
 import Levenshtein
 from nltk.corpus import words, wordnet
 import nltk
@@ -156,21 +156,47 @@ def filter_wiki(df):
     return df[[not i for i in is_wikis]]
 
 
-def is_dictonary(word, api_key):
-    url = f"https://dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={api_key}"
-    response = requests.get(url)
+def is_valid_word_merriam_webster(word, collegiate_key, medical_key):
+    """
+    Check if a word exists in either the Collegiate API or Medical API.
+    Stops checking after finding the word in one API.
+    """
+    base_urls = {
+        "collegiate": f"https://dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={collegiate_key}",
+        "medical": f"https://www.dictionaryapi.com/api/v3/references/medical/json/{word}?key={medical_key}",
+    }
 
-    if response.status_code == 200:
-        data = response.json()
-        if isinstance(data, list) and len(data) > 0:
-            if isinstance(data[0], dict) and 'meta' in data[0]:
-                return True 
-    return False 
+    for api_name, url in base_urls.items():
+        try:
+            print(f"Testing {api_name.capitalize()} API: {url}")
+            response = requests.get(url, timeout=5)
+            print(f"Status Code: {response.status_code}")
 
-def filter_dictionary(df, api_key):
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        if isinstance(data[0], dict) and 'meta' in data[0]:
+                            print(f"Word found in {api_name.capitalize()} API.")
+                            return True
+                except Exception as e:
+                    print(f"Error decoding JSON for {api_name.capitalize()} API: {e}")
+            else:
+                print(f"Non-200 response from {api_name.capitalize()} API: {response.status_code}")
+        except Exception as e:
+            print(f"Request failed for {api_name.capitalize()} API: {e}")
+
+    print(f"Word not found in Collegiate or Medical API.")
+    return False
+
+
+def filter_merriam_webster(df, collegiate_key, medical_key):
+    """
+    Filter words using Merriam-Webster's Collegiate and Medical APIs.
+    """
     valid_words = []
-    for word in tqdm(df['word'], desc="Filtering with Merriam-Webster"):
-        if is_dictonary(word, api_key):
+    for word in tqdm(df['word'], desc="Filtering with Merriam-Webster APIs"):
+        if is_valid_word_merriam_webster(word, collegiate_key, medical_key):
             valid_words.append(word)
 
     return df[~df['word'].isin(valid_words)]
@@ -215,14 +241,15 @@ def main():
     df2 = filter_archs(df1)
     save_filtered_and_removed(df1, df2, "archs")
 
-    df3 = filter_spellchecker(df2, ['hunspell', 'spellchecker'])
+    df3 = filter_spellchecker(df2, ['spellchecker'])
     save_filtered_and_removed(df2, df3, "spell_checker")
 
     df4 = filter_wiki(df3)
     save_filtered_and_removed(df3, df4, "wiki")
 
-    df5 = filter_dictionary(df4, API_KEY)
-    save_filtered_and_removed(df4, df5, "dictionary")
+    # Merriam-Webster API로 필터링 추가
+    df5 = filter_merriam_webster(df4, collegiate_key, medical_key)
+    save_filtered_and_removed(df4, df5, "merriam_webster")
 
     os.makedirs("./data/words", exist_ok=True)
     df5.to_csv(f"./data/words/total_non_words.csv", index=False)
