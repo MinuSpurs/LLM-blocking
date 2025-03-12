@@ -142,7 +142,7 @@ def main():
             query = row.query
 
             for word, word_index in word_indices:
-                word_ = re.sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', word.lower())
+                word_ = re.sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', word.lower()) # strip special chars edges
 
                 sentence = extract_pattern_sentence(word_, word_index, doc, query)
                 if sentence:

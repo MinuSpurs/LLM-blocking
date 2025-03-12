@@ -185,20 +185,20 @@ def filter_merriam_webster(df, collegiate_key, medical_key):
 
 def main():
 
-    total_csv_path = './data/csv/total.csv'
+    total_csv_path = './data_/csv/total.csv'
     filtering_path = './data/filtering'    
     word_path = './data/words'
 
     total_df = pd.read_csv(total_csv_path) # debug : .iloc[:100]
 
     # Set total.csv file to be preprocessed
-    total_df = total_df.rename(columns={'word':'org_word'})
-    total_df['word'] = total_df['org_word'].apply(strip_special_chars_edges)
+    total_df['org'] = total_df['word']
+    total_df['word'] = total_df['word'].astype(str).apply(strip_special_chars_edges)
     total_df['word'] = total_df['word'].apply(process_word)
     total_df = total_df[total_df['word'] != False].reset_index(drop=True)
     total_df.to_csv(total_csv_path.split('.csv')[0] + '_.csv', index=False)
     print(f"Total data {len(total_df) }saved to {total_csv_path.split('.csv')[0] + '_.csv'}")
-    
+
 
     # Word filtering
     df = total_df.copy()

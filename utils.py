@@ -10,8 +10,7 @@ def clean_text(text):
         return "" 
 
 
-def save_filtered_and_removed(original_df, filtered_df, stage_name):
-    filtering_dir = './data/filtering/'    
+def save_filtered_and_removed(original_df, filtered_df, stage_name, filtering_dir='./data/filtering/'):
     os.makedirs(filtering_dir, exist_ok=True)
 
     removed_df = original_df[~original_df.index.isin(filtered_df.index)]
