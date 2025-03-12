@@ -1,5 +1,10 @@
 /data/*
+/data_
+
 /dump
+/test
+
 /__pycache__
 personal.py
 legros/
+llama2/

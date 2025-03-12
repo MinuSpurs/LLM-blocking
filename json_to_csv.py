@@ -4,6 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 import spacy
 import re
+from utils import strip_special_chars_edges
 
 # nltk.download('words')
 # nltk.download('wordnet')   # Remove comments as needed
@@ -100,7 +101,6 @@ def extract_pattern_sentence(word, pattern_index, doc, query):
 
 
 
-
 def main():
 
     os.makedirs("./data/csv", exist_ok=True)
@@ -142,14 +142,15 @@ def main():
             query = row.query
 
             for word, word_index in word_indices:
-                word_ = re.sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', word.lower()) # strip special chars edges
-
-                sentence = extract_pattern_sentence(word_, word_index, doc, query)
+                word_ = strip_special_chars_edges(word) # strip special chars edges
+                if word_ == '' or word_ == None:
+                    continue
+                sentence = extract_pattern_sentence(word_.lower(), word_index, doc, query)
                 if sentence:
                     result_rows.append({
                         'span_id': row['span_id'],
                         'doc_ix': row.doc_ix,
-                        'word': word,
+                        'word': word_,
                         'sentence': sentence,
                         'query': query
                     })

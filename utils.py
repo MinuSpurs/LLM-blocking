@@ -9,6 +9,11 @@ def clean_text(text):
     else:
         return "" 
 
+def strip_special_chars_edges(word):
+    if isinstance(word, str):
+        return re.sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', word)
+    return word
+
 
 def save_filtered_and_removed(original_df, filtered_df, stage_name, filtering_dir='./data/filtering/'):
     os.makedirs(filtering_dir, exist_ok=True)

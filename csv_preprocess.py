@@ -18,12 +18,8 @@ import wikipedia
 nlp = spacy.load("en_core_web_sm")
 
 
-def strip_special_chars_edges(word):
-    if isinstance(word, str):
-        return re.sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', word.lower())
-    return word
-
 def process_word(word):
+    word = word.lower()
 
     # Count hyphens
     hyphen_count = word.count('-')
@@ -41,8 +37,7 @@ def filter_words(df):
     english_words = set(words.words())
     consecutive_pattern = r'(.)\1{2,}' 
 
-    filtered = df[df['word'].str.match('^[a-zA-Z]+$')]
-    filtered1 = filtered[filtered['word'].str.len().between(4, 22)]
+    filtered1 = df[df['word'].str.len().between(4, 22)]
     filtered2 = filtered1[filtered1['word'].apply(lambda x: not bool(re.search(consecutive_pattern, x)))]
     filtered2 = filtered2[~filtered2['word'].isin(english_words)].copy()
     filtered3 = filtered2[filtered2['word'].apply(lambda x: len(wordnet.synsets(x))==0)].copy()
@@ -185,7 +180,7 @@ def filter_merriam_webster(df, collegiate_key, medical_key):
 
 def main():
 
-    total_csv_path = './data_/csv/total.csv'
+    total_csv_path = './data/csv/total.csv'
     filtering_path = './data/filtering'    
     word_path = './data/words'
 
@@ -193,12 +188,10 @@ def main():
 
     # Set total.csv file to be preprocessed
     total_df['org'] = total_df['word']
-    total_df['word'] = total_df['word'].astype(str).apply(strip_special_chars_edges)
-    total_df['word'] = total_df['word'].apply(process_word)
-    total_df = total_df[total_df['word'] != False].reset_index(drop=True)
-    total_df.to_csv(total_csv_path.split('.csv')[0] + '_.csv', index=False)
-    print(f"Total data {len(total_df) }saved to {total_csv_path.split('.csv')[0] + '_.csv'}")
-
+    total_df['word'] = total_df['word'].astype(str).apply(process_word)
+    total_df = total_df[total_df['word'] != False].dropna().reset_index(drop=True)
+    total_df.to_csv(total_csv_path.split('.csv')[0] + '_preprocess.csv', index=False)
+    print(f"Total data {len(total_df)} saved to {total_csv_path.split('.csv')[0] + '_.csv'}")
 
     # Word filtering
     df = total_df.copy()
